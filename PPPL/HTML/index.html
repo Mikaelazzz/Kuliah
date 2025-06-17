@@ -4,54 +4,151 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
-    <title>Document</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Biodata</title>
 </head>
 <body>
-    <section class="font-poppins text-xl container bg-blue">
-        <div class="">
-            <a href="index.html">Utama</a>
+    <section class="font-poppins text-2xl container bg-blue">
+        <div>
+            <a href="index.html">Home</a>
         </div>
         <div>
-            <a href="main.html">Main</a>
+            <a href="project.html">Project</a>
+        </div>
+        <div>
+            <a href="contact.html">Contact</a>
         </div>
     </section>
 
+    <!-- Hero Section -->
     <section class="font-poppins text-xl container2">
-        <div class="bg-gray pembagi">
-            <div>
-                <img width="250px" height="250px" class="img rounded" src="exam.jpg" alt="Example">
-            </div>
-            <div>
-                <div class="text-3xl">Vincentius Johanes Lwie Jaya</div>
-                <div style="margin-top: 15px; margin-bottom: 15px;">
-                    <div class="text-2xl">Mojokerto</div>
-                    <div class="text-2xl">19th</div>
-                    <div class="text-2xl">Main Game</div>
+        <div class="bg-gray hero-section">
+            <div class="hero-content">
+                <div class="profile-image-container">
+                    <img width="500px" height="500px" class="img rounded profile-image tengah" src="exam.jpg" alt="Vincentius Johanes Lwie Jaya">
+                    <div class="profile-badge">
+                        <i class="fas fa-user-graduate"></i>
+                    </div>
                 </div>
-                <div class="text-2xl">Universitas Katolik Darma Cendika</div>
-                <div class="text-2xl">Teknik Informatika 2023</div>
+                <div class="profile-info">
+                    <div class="name-section">
+                        <h1 class="profile-name">Vincentius Johanes Lwie Jaya</h1>
+                        <div class="profile-title">
+                            <i class="fas fa-code"></i>
+                            <span>Mahasiswa Teknik Informatika</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-cards">
+                        <div class="info-card">
+                            <div class="info-icon">
+                                <i class="fas fa-map-marker-alt"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Lokasi</span>
+                                <span class="info-value">Mojokerto</span>
+                            </div>
+                        </div>
+                        
+                        <div class="info-card">
+                            <div class="info-icon">
+                                <i class="fas fa-birthday-cake"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Usia</span>
+                                <span class="info-value">19 Tahun</span>
+                            </div>
+                        </div>
+                        
+                        <div class="info-card">
+                            <div class="info-icon">
+                                <i class="fas fa-gamepad"></i>
+                            </div>
+                            <div class="info-content">
+                                <span class="info-label">Hobi</span>
+                                <span class="info-value">Main Game</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="education-section">
+                        <div class="education-card">
+                            <div class="education-icon">
+                                <i class="fas fa-university"></i>
+                            </div>
+                            <div class="education-content">
+                                <h3>Universitas Katolik Darma Cendika</h3>
+                                <p>Teknik Informatika - Angkatan 2023</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            </div>
+        </div>
     </section>
 
+    <!-- Skills Section -->
     <section class="font-poppins text-xl container2">
-        <div class="font-poppins text-xl container2 bg-gray">
-            <div class="text-3xl">About My Skill</div>
-            <div class="text-2xl flex">
-                <div>HTML</div>
-                <div>JavaScript</div>
-                <div>CSS</div>
-                <div>PHP</div>
-                <div>TailwindCSS</div>
-                <div>Bootstrap</div>
+        <div class="font-poppins text-xl container2 bg-gray skills-section">
+            <div class="section-header">
+                <i class="fas fa-tools"></i>
+                <h2 class="text-3xl">Skill Saya</h2>
             </div>
+            <div class="skills-grid">
+                <div class="skill-item">
+                    <i class="fab fa-html5"></i>
+                    <span>HTML</span>
+                </div>
+                <div class="skill-item">
+                    <i class="fab fa-js-square"></i>
+                    <span>JavaScript</span>
+                </div>
+                <div class="skill-item">
+                    <i class="fab fa-css3-alt"></i>
+                    <span>CSS</span>
+                </div>
+                <div class="skill-item">
+                    <i class="fab fa-php"></i>
+                    <span>PHP</span>
+                </div>
+                <div class="skill-item">
+                    <i class="fas fa-wind"></i>
+                    <span>TailwindCSS</span>
+                </div>
+                <div class="skill-item">
+                    <i class="fab fa-bootstrap"></i>
+                    <span>Bootstrap</span>
+                </div>
+            </div>
+        </div>
     </section>
 
+    <!-- About Section -->
     <section class="font-poppins text-xl container2">
-        <div class="bg-gray">
-            <div class="text-3xl">Tentang Saya</div>
-            <div class="text-2xl">
-                Saya adalah seorang mahasiswa Teknik Informatika di Universitas Katolik Darma Cendika. Saya lahir dan besar di Mojokerto, dan saat ini berusia 19 tahun. Saya sangat menyukai bermain game.
+        <div class="bg-gray about-section">
+            <div class="section-header">
+                <i class="fas fa-user"></i>
+                <h2 class="text-3xl">Tentang Saya</h2>
+            </div>
+            <div class="about-content">
+                <p class="about-text">
+                    Saya Mahasiswa Teknik Informatika di Universitas Katolik Darma Cendika. 
+                    Saya lahir dan tumbuh di kota Mojokerto, dan saat ini berusia 19 tahun. Saya mempunyai hobi bermain game dan saya tertarik dengan UI/UX, Website Developer, Software Engineering terkait dengan hobi saya.
+                </p>
+                <div class="about-highlights">
+                    <div class="highlight-item">
+                        <i class="fas fa-graduation-cap"></i>
+                        <span>Student</span>
+                    </div>
+                    <div class="highlight-item">
+                        <i class="fas fa-laptop-code"></i>
+                        <span>Developer</span>
+                    </div>
+                    <div class="highlight-item">
+                        <i class="fas fa-heart"></i>
+                        <span>Gamer</span>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
