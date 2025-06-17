@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+*{
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.font-poppins {
+  font-family: 'Poppins', sans-serif;
+}
+
+.text-xl {
+  font-size: 1.25rem;
+  color: white;
+}
+
+.container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 25px;
+    gap: 20px;
+}
+
+.bg-blue{
+    background-color: #3b82f6; /* Tailwind's blue-500 */
+    border-radius: 0 0 15px 15px;
+}
+
+a {
+    text-decoration: none;
+    color: white;
+}
+
+.bg-gray {
+    background-color: darkgray;
+    border-radius: 15px;
+    padding: 20px;
+    inset: 0;
+}
+
+.container2 {
+    padding: 20px;
+}
+
+.pembagi {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+}
+
+.img {
+    object-fit: cover;
+}
+
+.rounded {
+    border-radius: 15px;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+    color: white;
+}
+
+.text-3xl {
+    font-size: 1.8rem;
+    color: white;
+}
+
+.flex {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+}
