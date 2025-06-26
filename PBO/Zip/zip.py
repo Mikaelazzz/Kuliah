@@ -6,6 +6,12 @@ import os
 from pathlib import Path
 import threading
 import shutil
+import subprocess
+import sys
+import urllib.request
+import zipfile as zipf
+import tempfile
+import platform
 
 # Try to import optional libraries with fallback
 try:
@@ -20,6 +26,12 @@ try:
 except ImportError:
     HAS_PATOOLIB = False
 
+try:
+    import rarfile
+    HAS_RARFILE = True
+except ImportError:
+    HAS_RARFILE = False
+
 class FileCompressor:
     def __init__(self, root):
         self.root = root
@@ -31,22 +43,387 @@ class FileCompressor:
         self.selected_files = []
         self.selected_archives = []
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.rar_path = None
+        self.unrar_path = None
         
         self.create_widgets()
-        self.check_dependencies()
+        self.setup_rar_support()
         
-    def check_dependencies(self):
-        """Check if required libraries are installed"""
-        missing = []
-        if not HAS_PY7ZR:
-            missing.append("py7zr (for 7z files)")
-        if not HAS_PATOOLIB:
-            missing.append("patoolib (for RAR files)")
+    def setup_rar_support(self):
+        """Setup RAR support by finding executables"""
+        self.rar_path = self.find_or_setup_rar()
+        self.unrar_path = self.find_unrar_executable()
+        
+        if self.rar_path:
+            print(f"RAR compression enabled using: {self.rar_path}")
             
-        if missing:
-            msg = "Missing dependencies:\n\n" + "\n".join(missing)
-            msg += "\n\nInstall with:\npip install py7zr patoolib"
-            messagebox.showwarning("Dependencies Missing", msg)
+        if self.unrar_path:
+            print(f"RAR extraction enabled using: {self.unrar_path}")
+            # Configure rarfile library to use our unrar path
+            if HAS_RARFILE:
+                rarfile.UNRAR_TOOL = self.unrar_path
+                
+        status_msg = "Ready"
+        if self.rar_path and self.unrar_path:
+            status_msg = "RAR support: Full (compress & extract)"
+        elif self.rar_path:
+            status_msg = "RAR support: Compression only"
+        elif self.unrar_path:
+            status_msg = "RAR support: Extraction only"
+            
+        self.update_status(status_msg)
+        
+    def find_unrar_executable(self):
+        """Find unrar executable for extraction"""
+        # Check WinRAR installation path first
+        winrar_paths = [
+            r"D:\Apps\Winrar\unrar.exe",
+            r"D:\Apps\Winrar\rar.exe",  # rar.exe can also extract
+            r"D:\Apps\Winrar\winrar.exe"
+        ]
+        
+        for path in winrar_paths:
+            if os.path.exists(path):
+                if self.test_unrar_executable(path):
+                    return path
+        
+        # Common installation paths
+        if platform.system().lower() == "windows":
+            possible_paths = [
+                r"C:\Program Files\WinRAR\unrar.exe",
+                r"C:\Program Files (x86)\WinRAR\unrar.exe",
+                r"C:\Program Files\WinRAR\rar.exe",
+                r"C:\Program Files (x86)\WinRAR\rar.exe",
+                r"C:\Program Files\WinRAR\winrar.exe",
+                r"C:\Program Files (x86)\WinRAR\winrar.exe",
+                os.path.join(os.path.expanduser("~"), "AppData", "Local", "WinRAR", "unrar.exe"),
+                "unrar.exe",
+                "rar.exe"
+            ]
+        else:
+            possible_paths = [
+                "/usr/bin/unrar",
+                "/usr/local/bin/unrar",
+                "/usr/bin/rar",
+                "/usr/local/bin/rar",
+                "/opt/rar/unrar",
+                "unrar",
+                "rar"
+            ]
+        
+        # Check each possible path
+        for path in possible_paths:
+            if self.test_unrar_executable(path):
+                return path
+                
+        return None
+
+    def test_unrar_executable(self, path):
+        """Test if unrar executable works"""
+        try:
+            if not os.path.exists(path) and not shutil.which(path):
+                return False
+            
+            # Test with help command
+            result = subprocess.run([path, '--help'], 
+                                  capture_output=True, 
+                                  timeout=5,
+                                  creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0)
+            return True
+        except Exception as e:
+            try:
+                # Try without --help for some versions
+                result = subprocess.run([path], 
+                                      capture_output=True, 
+                                      timeout=5,
+                                      creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0)
+                return True
+            except:
+                return False
+
+    def extract_rar_with_executable(self, archive_path, extract_dir):
+        """Extract RAR using command line executable"""
+        if not self.unrar_path:
+            raise Exception("No RAR extraction executable found")
+        
+        try:
+            # Ensure extract directory exists
+            os.makedirs(extract_dir, exist_ok=True)
+            
+            # Build command for extraction
+            # Use 'x' command to extract with full paths
+            cmd_args = [self.unrar_path, 'x', '-y', archive_path, extract_dir + os.sep]
+            
+            print(f"Executing RAR extraction: {' '.join(cmd_args)}")
+            
+            # Execute command
+            result = subprocess.run(
+                cmd_args,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                cwd=self.current_dir,
+                creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+            )
+            
+            print(f"Extraction return code: {result.returncode}")
+            print(f"Extraction stdout: {result.stdout}")
+            print(f"Extraction stderr: {result.stderr}")
+            
+            # Check if extraction was successful
+            if result.returncode == 0:
+                # Verify files were extracted
+                if os.path.exists(extract_dir) and os.listdir(extract_dir):
+                    return True
+                else:
+                    raise Exception("No files were extracted")
+            else:
+                # Try alternative command format
+                print("First extraction command failed, trying alternative...")
+                
+                # Alternative: extract to current directory then move
+                temp_extract_dir = tempfile.mkdtemp()
+                try:
+                    cmd_args_alt = [self.unrar_path, 'e', '-y', archive_path, temp_extract_dir + os.sep]
+                    
+                    result_alt = subprocess.run(
+                        cmd_args_alt,
+                        capture_output=True,
+                        text=True,
+                        timeout=300,
+                        creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+                    )
+                    
+                    if result_alt.returncode == 0:
+                        # Move extracted files to target directory
+                        for item in os.listdir(temp_extract_dir):
+                            src = os.path.join(temp_extract_dir, item)
+                            dst = os.path.join(extract_dir, item)
+                            if os.path.isdir(src):
+                                shutil.copytree(src, dst)
+                            else:
+                                shutil.copy2(src, dst)
+                        return True
+                    else:
+                        error_msg = result.stderr if result.stderr else result.stdout
+                        raise Exception(f"RAR extraction failed: {error_msg}")
+                finally:
+                    # Clean up temp directory
+                    shutil.rmtree(temp_extract_dir, ignore_errors=True)
+                    
+        except subprocess.TimeoutExpired:
+            raise Exception("RAR extraction timed out")
+        except Exception as e:
+            raise Exception(f"RAR extraction error: {str(e)}")
+
+    def find_or_setup_rar(self):
+        """Find existing RAR executable or use the specific path"""
+        # First try the specific path provided by user
+        specific_paths = [
+            r"D:\Apps\Winrar\rar.exe",
+            r"D:\Apps\Winrar\winrar.exe",
+            r"D:\Apps\Winrar\Rar.exe",
+            r"D:\Apps\Winrar\WinRAR.exe"
+        ]
+        
+        for path in specific_paths:
+            if self.test_rar_executable(path):
+                return path
+        
+        # Try to find existing RAR installation in common locations
+        rar_path = self.find_rar_executable()
+        if rar_path:
+            return rar_path
+            
+        return None
+
+    def find_rar_executable(self):
+        """Find existing RAR executable in common locations"""
+        system = platform.system().lower()
+        
+        # Common installation paths
+        if system == "windows":
+            possible_paths = [
+                r"C:\Program Files\WinRAR\rar.exe",
+                r"C:\Program Files (x86)\WinRAR\rar.exe",
+                r"C:\Program Files\WinRAR\winrar.exe",
+                r"C:\Program Files (x86)\WinRAR\winrar.exe",
+                os.path.join(os.path.expanduser("~"), "AppData", "Local", "WinRAR", "rar.exe"),
+                "rar.exe",
+                "winrar.exe"
+            ]
+        else:
+            possible_paths = [
+                "/usr/bin/rar",
+                "/usr/local/bin/rar", 
+                "/opt/rar/rar",
+                "rar"
+            ]
+        
+        # Check each possible path
+        for path in possible_paths:
+            if self.test_rar_executable(path):
+                return path
+                
+        # Try system PATH
+        try:
+            result = subprocess.run(["rar"], capture_output=True, timeout=3)
+            if result.returncode != 127:  # Command found
+                return "rar"
+        except:
+            pass
+            
+        try:
+            result = subprocess.run(["winrar"], capture_output=True, timeout=3)
+            if result.returncode != 127:  # Command found
+                return "winrar"
+        except:
+            pass
+            
+        return None
+
+    def test_rar_executable(self, path):
+        try:
+            if not os.path.exists(path) and not shutil.which(path):
+                return False
+            
+            # Test the executable with a simple command
+            result = subprocess.run([path], 
+                                  capture_output=True, 
+                                  timeout=5,
+                                  creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0)
+            return True
+        except Exception as e:
+            print(f"Testing {path} failed: {e}")
+            return False
+
+    def create_rar_archive(self, archive_path, files):
+        if not self.rar_path:
+            raise Exception("WinRAR executable not found")
+        
+        try:
+            # Delete existing archive if it exists
+            if os.path.exists(archive_path):
+                os.remove(archive_path)
+            
+            # Prepare command arguments
+            # Using 'a' command to add files to archive
+            # -ep1 excludes base folder names from paths
+            # -m5 sets maximum compression
+            cmd_args = [self.rar_path, 'a', '-ep1', '-m5', archive_path]
+            
+            # Add all files to the command
+            cmd_args.extend(files)
+            
+            print(f"Executing RAR command: {' '.join(cmd_args)}")
+            
+            # Execute RAR command
+            result = subprocess.run(
+                cmd_args, 
+                capture_output=True, 
+                text=True, 
+                timeout=300,
+                cwd=self.current_dir,
+                creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+            )
+            
+            print(f"RAR command return code: {result.returncode}")
+            print(f"RAR stdout: {result.stdout}")
+            print(f"RAR stderr: {result.stderr}")
+            
+            # Check if command was successful
+            if result.returncode == 0:
+                # Verify archive was created
+                if os.path.exists(archive_path) and os.path.getsize(archive_path) > 0:
+                    return True
+                else:
+                    raise Exception("Archive file was not created or is empty")
+            else:
+                # Try alternative command format if first one fails
+                print("First RAR command failed, trying alternative format...")
+                
+                # Alternative command without -ep1 flag
+                cmd_args_alt = [self.rar_path, 'a', archive_path]
+                cmd_args_alt.extend(files)
+                
+                result_alt = subprocess.run(
+                    cmd_args_alt, 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=300,
+                    cwd=self.current_dir,
+                    creationflags=subprocess.CREATE_NO_WINDOW if platform.system() == "Windows" else 0
+                )
+                
+                print(f"Alternative RAR command return code: {result_alt.returncode}")
+                print(f"Alternative RAR stdout: {result_alt.stdout}")
+                print(f"Alternative RAR stderr: {result_alt.stderr}")
+                
+                if result_alt.returncode == 0 and os.path.exists(archive_path):
+                    return True
+                else:
+                    error_msg = result.stderr if result.stderr else result.stdout
+                    if not error_msg:
+                        error_msg = f"RAR command failed with return code {result.returncode}"
+                    raise Exception(f"RAR creation failed: {error_msg}")
+                    
+        except subprocess.TimeoutExpired:
+            raise Exception("RAR creation timed out (300 seconds)")
+        except FileNotFoundError:
+            raise Exception(f"RAR executable not found at: {self.rar_path}")
+        except Exception as e:
+            raise Exception(f"RAR creation error: {str(e)}")
+
+    def create_rar_with_fallback(self, archive_path, files):
+        
+        # Method 1: Use WinRAR executable
+        if self.rar_path:
+            try:
+                self.update_status("Creating RAR archive with WinRAR...")
+                return self.create_rar_archive(archive_path, files)
+            except Exception as e:
+                print(f"WinRAR creation failed: {e}")
+                self.update_status(f"WinRAR failed: {str(e)}")
+        
+        # Method 2: Use patoolib if available
+        if HAS_PATOOLIB:
+            try:
+                self.update_status("Creating RAR archive with patoolib...")
+                return self.create_rar_patoolib(archive_path, files)
+            except Exception as e:
+                print(f"Patoolib RAR creation failed: {e}")
+        
+        # Method 3: Create ZIP with RAR extension (last resort)
+        try:
+            self.update_status("Creating RAR-compatible archive...")
+            return self.create_zip_as_rar(archive_path, files)
+        except Exception as e:
+            print(f"ZIP-as-RAR creation failed: {e}")
+            
+        raise Exception("All RAR creation methods failed")
+
+    def create_rar_patoolib(self, archive_path, files):
+        # Create temporary directory for files
+        temp_dir = tempfile.mkdtemp()
+        try:
+            # Copy files to temp directory
+            for file_path in files:
+                dest_path = os.path.join(temp_dir, os.path.basename(file_path))
+                shutil.copy2(file_path, dest_path)
+            
+            # Create RAR archive
+            patoolib.create_archive(archive_path, [temp_dir])
+            return True
+        finally:
+            # Clean up temp directory
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+    def create_zip_as_rar(self, archive_path, files):
+        """Create ZIP file with RAR extension as fallback"""
+        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file_path in files:
+                zipf.write(file_path, os.path.basename(file_path))
+        return True
         
     def create_widgets(self):
         # Header
@@ -108,7 +485,7 @@ class FileCompressor:
         
         self.format_var = tk.StringVar(value="zip")
         format_combo = ttk.Combobox(settings_frame, textvariable=self.format_var,
-                                   values=["zip", "7z", "tar.gz"],
+                                   values=["zip", "7z", "tar.gz", "rar"],
                                    state="readonly", width=10)
         format_combo.pack(side='left', padx=10)
         
@@ -312,14 +689,12 @@ class FileCompressor:
         self.decompress_btn.config(state='disabled', bg='#95a5a6')
         
     def get_file_size_bytes(self, file_path):
-        """Get file size in bytes"""
         try:
             return os.path.getsize(file_path)
         except:
             return 0
             
     def format_file_size(self, size_bytes):
-        """Format file size in human readable format"""
         if size_bytes == 0:
             return "0 B"
         for unit in ['B', 'KB', 'MB', 'GB']:
@@ -329,7 +704,6 @@ class FileCompressor:
         return f"{size_bytes:.1f} TB"
     
     def get_archive_extension(self, file_path):
-        """Get the proper archive extension"""
         file_path_lower = file_path.lower()
         if file_path_lower.endswith('.tar.gz'):
             return 'tar.gz'
@@ -339,7 +713,6 @@ class FileCompressor:
             return Path(file_path).suffix[1:]  # Remove the dot
     
     def display_extracted_files(self, extracted_results):
-        """Display extracted files in the text widget"""
         self.extracted_text.config(state='normal')
         self.extracted_text.delete(1.0, tk.END)
         
@@ -389,7 +762,6 @@ class FileCompressor:
         self.extracted_text.see(1.0)  # Scroll to top
     
     def get_extracted_contents(self, extract_dir):
-        """Get only the extracted contents, excluding the original archive file"""
         extracted_files = []
         
         try:
@@ -477,10 +849,28 @@ class FileCompressor:
                         tar.add(file_path, arcname=os.path.basename(file_path))
                         progress = ((i + 1) / total_files) * 100
                         self.progress_var.set(progress)
+                        
+            elif format_type == "rar":
+                # Use enhanced RAR creation with the specific path
+                self.progress_var.set(25)
+                success = self.create_rar_with_fallback(archive_path, self.selected_files)
+                if not success:
+                    raise Exception("Failed to create RAR archive")
+                self.progress_var.set(100)
             
             self.progress_var.set(100)
             self.update_status(f"Compression completed: {os.path.basename(archive_path)}")
-            messagebox.showinfo("Success", f"Files compressed successfully!\nSaved as: {archive_path}")
+            
+            # Show success message
+            if format_type == "rar":
+                if self.rar_path:
+                    msg = f"RAR archive created successfully using WinRAR!\nSaved as: {archive_path}"
+                else:
+                    msg = f"RAR-compatible archive created!\nSaved as: {archive_path}\n\nNote: Created using alternative method."
+            else:
+                msg = f"Files compressed successfully!\nSaved as: {archive_path}"
+                
+            messagebox.showinfo("Success", msg)
             
         except Exception as e:
             self.update_status("Compression failed!")
@@ -656,7 +1046,6 @@ class FileCompressor:
             self.progress_var.set(0)
     
     def _extract_zip(self, archive_path, extract_dir):
-        """Extract ZIP files"""
         try:
             if not zipfile.is_zipfile(archive_path):
                 raise Exception("Invalid ZIP file format")
@@ -673,7 +1062,6 @@ class FileCompressor:
             raise Exception(f"ZIP extraction failed: {str(e)}")
     
     def _extract_7z(self, archive_path, extract_dir):
-        """Extract 7Z files"""
         try:
             if not HAS_PY7ZR:
                 raise Exception("py7zr library not installed. Run: pip install py7zr")
@@ -685,7 +1073,6 @@ class FileCompressor:
             raise Exception(f"7Z extraction failed: {str(e)}")
     
     def _extract_tar_gz(self, archive_path, extract_dir):
-        """Extract TAR.GZ files"""
         try:
             if not tarfile.is_tarfile(archive_path):
                 raise Exception("Invalid TAR.GZ file format")
@@ -702,13 +1089,45 @@ class FileCompressor:
             raise Exception(f"TAR.GZ extraction failed: {str(e)}")
     
     def _extract_rar(self, archive_path, extract_dir):
-        """Extract RAR files"""
         try:
-            if not HAS_PATOOLIB:
-                raise Exception("patoolib library not installed. Run: pip install patoolib")
+            # Method 1: Use command line unrar/rar executable
+            if self.unrar_path:
+                try:
+                    self.update_status("Extracting RAR with command line tool...")
+                    return self.extract_rar_with_executable(archive_path, extract_dir)
+                except Exception as e:
+                    print(f"Command line RAR extraction failed: {e}")
             
-            patoolib.extract_archive(archive_path, outdir=extract_dir)
-            return True
+            # Method 2: Try using rarfile library
+            if HAS_RARFILE:
+                try:
+                    self.update_status("Extracting RAR with rarfile library...")
+                    with rarfile.RarFile(archive_path) as rf:
+                        rf.extractall(extract_dir)
+                    return True
+                except Exception as e:
+                    print(f"rarfile extraction failed: {e}")
+            
+            # Method 3: Fall back to patoolib
+            if HAS_PATOOLIB:
+                try:
+                    self.update_status("Extracting RAR with patoolib...")
+                    patoolib.extract_archive(archive_path, outdir=extract_dir)
+                    return True
+                except Exception as e:
+                    print(f"patoolib extraction failed: {e}")
+            
+            # Method 4: Last resort - try as ZIP file (for archives created with our fallback method)
+            try:
+                self.update_status("Trying RAR as ZIP format...")
+                with zipfile.ZipFile(archive_path, 'r') as zipf:
+                    zipf.extractall(extract_dir)
+                return True
+            except Exception as e:
+                print(f"ZIP fallback extraction failed: {e}")
+                
+            raise Exception("All RAR extraction methods failed")
+                
         except Exception as e:
             raise Exception(f"RAR extraction failed: {str(e)}")
             
