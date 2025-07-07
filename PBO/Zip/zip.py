@@ -50,7 +50,6 @@ class FileCompressor:
         self.setup_rar_support()
         
     def setup_rar_support(self):
-        """Setup RAR support by finding executables"""
         self.rar_path = self.find_or_setup_rar()
         self.unrar_path = self.find_unrar_executable()
         
@@ -74,7 +73,6 @@ class FileCompressor:
         self.update_status(status_msg)
         
     def find_unrar_executable(self):
-        """Find unrar executable for extraction"""
         # Check WinRAR installation path first
         winrar_paths = [
             r"D:\Apps\Winrar\unrar.exe",
@@ -119,7 +117,6 @@ class FileCompressor:
         return None
 
     def test_unrar_executable(self, path):
-        """Test if unrar executable works"""
         try:
             if not os.path.exists(path) and not shutil.which(path):
                 return False
@@ -142,7 +139,6 @@ class FileCompressor:
                 return False
 
     def extract_rar_with_executable(self, archive_path, extract_dir):
-        """Extract RAR using command line executable"""
         if not self.unrar_path:
             raise Exception("No RAR extraction executable found")
         
@@ -217,7 +213,6 @@ class FileCompressor:
             raise Exception(f"RAR extraction error: {str(e)}")
 
     def find_or_setup_rar(self):
-        """Find existing RAR executable or use the specific path"""
         # First try the specific path provided by user
         specific_paths = [
             r"D:\Apps\Winrar\rar.exe",
@@ -238,7 +233,6 @@ class FileCompressor:
         return None
 
     def find_rar_executable(self):
-        """Find existing RAR executable in common locations"""
         system = platform.system().lower()
         
         # Common installation paths
@@ -375,7 +369,6 @@ class FileCompressor:
             raise Exception(f"RAR creation error: {str(e)}")
 
     def create_rar_with_fallback(self, archive_path, files):
-        
         # Method 1: Use WinRAR executable
         if self.rar_path:
             try:
@@ -403,6 +396,7 @@ class FileCompressor:
         raise Exception("All RAR creation methods failed")
 
     def create_rar_patoolib(self, archive_path, files):
+        """Create RAR using patoolib"""
         # Create temporary directory for files
         temp_dir = tempfile.mkdtemp()
         try:
@@ -419,7 +413,6 @@ class FileCompressor:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
     def create_zip_as_rar(self, archive_path, files):
-        """Create ZIP file with RAR extension as fallback"""
         with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for file_path in files:
                 zipf.write(file_path, os.path.basename(file_path))
@@ -929,8 +922,8 @@ class FileCompressor:
                         if archive_name.endswith('.tar'):
                             archive_name = archive_name[:-4]
                     
-                    # Create unique extraction directory
-                    base_extract_dir = f"Extracted_{archive_name}"
+                    # Create extraction directory with just the archive name (no "Extracted_" prefix)
+                    base_extract_dir = archive_name
                     extract_dir = os.path.join(self.current_dir, base_extract_dir)
                     
                     # Handle duplicate directories
